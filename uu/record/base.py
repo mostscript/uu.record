@@ -27,6 +27,10 @@ class Record(Persistent):
         if uid is None:
             uid = str(uuid.uuid4())
         self.record_uid = str(uid)
+    
+    @property
+    def __name__(self):
+        return self.record_uid
 
 
 class RecordContainer(Persistent):
@@ -408,17 +412,25 @@ class RecordContainer(Persistent):
     ...     print 'object added'
     ... 
     
-    Next, let's configure zope.event to use zope.component event subscribers:
+    Next, let's configure zope.event to use zope.component event subscribers;
+    most frameworks using zope.lifecycleevent already do this, but we will
+    configure this explicitly for documentation/testing purposes:
+    
     >>> import zope.event
     >>> from zope.component.event import objectEventNotify
     >>> zope.event.subscribers.append(objectEventNotify)
     
     Now, let's register the handlers:
+    
     >>> from zope.component import getGlobalSiteManager
     >>> gsm = getGlobalSiteManager()
     >>> for h in (handle_create, handle_modify, handle_remove, handle_add):
     ...     gsm.registerHandler(h)
     ... 
+    
+    Usually, these handlers will be registered in the global site manager
+    via ZCML and zope.configuration, but they are registered in Python
+    above for documentation/testing purposes.
     
     We can watch these event handlers get fired when CRUD methods are called.
     
