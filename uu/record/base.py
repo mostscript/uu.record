@@ -713,6 +713,10 @@ class RecordContainer(Persistent):
                 pass #ignore name
         return fieldnames
     
+    def _filtered_data(self, data):
+        fieldnames = self._ad_hoc_fieldlist(data)
+        return dict([(k, getattr(data, k, None)) for k in fieldnames])
+    
     def update(self, data, suppress_notify=False):
         """
         Given data, which may be a dict of field key/values or an actual 
@@ -744,8 +748,7 @@ class RecordContainer(Persistent):
         """
         if IRecord.providedBy(data):
             uid = data.record_uid
-            fieldnames = self._ad_hoc_fieldlist(data)
-            data = dict([(k, getattr(data, k, None)) for k in fieldnames])
+            data = self._filtered_data(data)
         else:
             uid = data.get('record_uid', None)
         if uid is None:
