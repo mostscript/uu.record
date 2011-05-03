@@ -721,6 +721,9 @@ class RecordContainer(Persistent):
         fieldnames = self._ad_hoc_fieldlist(data)
         return dict([(k, getattr(data, k, None)) for k in fieldnames])
     
+    def _before_update_notification(self, record, data):
+        pass #hook for subclasses
+    
     def update(self, data, suppress_notify=False):
         """
         Given data, which may be a dict of field key/values or an actual 
@@ -766,9 +769,13 @@ class RecordContainer(Persistent):
             # new, create, then add
             record = self.create(data)  # notifies created, modified events
             self.add(record)            # notified added event
+        self._before_update_notification(record, data)
         if (not suppress_notify) and getattr(record, '_p_changed', None):
             notify(ObjectModifiedEvent(self))
         return record
+
+    def _process_container_metadata(self, data):
+        return False #hook for subclasses
     
     def update_all(self, data):
         """
@@ -784,6 +791,7 @@ class RecordContainer(Persistent):
                 # dict might be singluar item, or wrapping object; a wrapping
                 # object would have a list called 'entries'
                 if 'entries' in _data and isinstance(_data['entries'], list):
+                    _modified = self._process_container_metadata(_data)
                     #wrapper, get entries from within.
                     _data = _data['entries']
                 else:
