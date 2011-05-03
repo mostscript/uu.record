@@ -518,6 +518,8 @@ class RecordContainer(Persistent):
     
     MAPPING_WHITELIST = (dict, PersistentDict,)
     
+    RECORD_INTERFACE = IRecord
+    
     factory = Record
     
     def __init__(self, factory=Record, _impl=PersistentDict):
@@ -532,25 +534,26 @@ class RecordContainer(Persistent):
             key = str(key)
         elif not (isinstance(key, str) and len(key)==36):
             raise KeyError('key does not appear to be string UUID: %s', key)
-        if not IRecord.providedBy(value):
-            raise ValueError('Record value must provide IRecord')
+        if not self.RECORD_INTERFACE.providedBy(value):
+            raise ValueError('Record value must provide %s' % (
+                self.RECORD_INTERFACE.__identifier__))
         self._entries[key] = value
         if key not in self._order:
             self._order.append(key)
     
     def __delitem__(self, record):
         uid = record
-        if IRecord.providedBy(record):
+        if self.RECORD_INTERFACE.providedBy(record):
             uid = str(record.record_uid)
         elif isinstance(record, uuid.UUID):
             uid = str(record)
         if not (isinstance(uid, str) and len(uid)==36):
-            raise ValueError('record neither IRecord object nor UUID')
+            raise ValueError('record neither record object nor UUID')
         if uid not in self._entries:
             raise ValueError('record not found contained within')
         if uid in self._order:
             self._order.remove(uid)
-        if not IRecord.providedBy(record):
+        if not self.RECORD_INTERFACE.providedBy(record):
             record = self._entries.get(uid) #need ref for event notify below
         del(self._entries[uid])
         notify(ObjectRemovedEvent(record, self, uid))
@@ -565,7 +568,7 @@ class RecordContainer(Persistent):
         """
         uid = record
         offset = abs(int(offset))
-        if IRecord.providedBy(record):
+        if self.RECORD_INTERFACE.providedBy(record):
             uid = record.record_uid
         if not uid or uid not in self._order:
             raise ValueError('cannot find record to move for id %s' % uid)
@@ -590,7 +593,7 @@ class RecordContainer(Persistent):
         """
         Get object providing IRecord for given UUID uid or return None
         """
-        if IRecord.providedBy(uid):
+        if self.RECORD_INTERFACE.providedBy(uid):
             uid = uid.record_uid  #special case to support __contains__() impl
         return self._entries.get(str(uid), default)
     
@@ -598,7 +601,7 @@ class RecordContainer(Persistent):
         """
         Given record as either IRecord object or UUID, is record contained?
         """
-        if IRecord.providedBy(record):
+        if self.RECORD_INTERFACE.providedBy(record):
             return self.get(record, None) is not None
         return str(record) in self._entries
     
@@ -668,7 +671,8 @@ class RecordContainer(Persistent):
                 setattr(record, key, value)
         if changelog:
             record._p_changed = True
-            changelog = [Attributes(IRecord, name) for name in changelog]
+            changelog = [Attributes(self.RECORD_INTERFACE, name)
+                            for name in changelog]
             notify(ObjectModifiedEvent(record, *changelog))
     
     def create(self, data=None):
@@ -746,7 +750,7 @@ class RecordContainer(Persistent):
             is the context of record).
         
         """
-        if IRecord.providedBy(data):
+        if self.RECORD_INTERFACE.providedBy(data):
             uid = data.record_uid
             data = self._filtered_data(data)
         else:
