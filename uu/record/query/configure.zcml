@@ -2,5 +2,11 @@
   xmlns="http://namespaces.zope.org/zope"
   xmlns:cmf="http://namespaces.zope.org/cmf"
   xmlns:five="http://namespaces.zope.org/five">
- 
+  
+  <utility
+    factory=".schemainfo.DottedNameInterfaceResolver"
+    provides=".interfaces.ISchemaResolver"
+    name="dottedname"
+    />
+  
 </configure>
