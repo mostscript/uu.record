@@ -75,9 +75,12 @@ Usage
     >>> assert 'record_uid' in [fi.name 
     ...                             for fi in info.fields] #field we know about
     >>> from zope.schema import getFieldsInOrder
+    >>> from zope.schema.interfaces import IBytes #index: default ignored
     >>> for fieldname, field in getFieldsInOrder(IRecord):
     ...     fieldinfo = [fi for fi in info.fields if fi.name==fieldname][0]
     ...     assert fieldinfo() is field
+    ...     if not IBytes.providedBy(field):
+    ...         assert fieldinfo.indexes #non-empty
     ... 
     
     Finally, we can register SchemaInfo as a multi-adapter for any arbitrary
@@ -97,6 +100,7 @@ from zope.component import adapts, queryUtility
 from zope.dottedname.resolve import resolve
 from zope.interface import Interface, implements, providedBy
 from zope.interface.interfaces import IInterface
+import zope.schema.interfaces
 from zope.schema.interfaces import IField
 from zope.schema import getFieldsInOrder
 
@@ -106,6 +110,36 @@ from uu.record.query.interfaces import ISchemaResolver
 
 is_an_ifield = lambda iface: issubclass(iface, IField) and not iface is IField
 field_types = lambda f: [i for i in providedBy(f) if is_an_ifield(i)]
+
+
+def field_index_types(fieldinfo):
+    if isinstance(fieldinfo.fieldtype, zope.schema.interfaces.ICollection):
+        field = fieldinfo() # resolve field instance
+        if (zope.schema.IText.providedBy(field.value_type) or 
+                zope.schema.IBytesLine.providedBy(field.value_type)):
+            return ('keyword',) #collection of text: keyword index
+    
+    idxmap = {
+        zope.schema.interfaces.ITextLine     : ('field', 'text'),
+        zope.schema.interfaces.IBytesLine    : ('field', 'text'),
+        zope.schema.interfaces.IText         : ('text',),
+        zope.schema.interfaces.IBytes        : (), #omit bytes fields!
+        }
+    if fieldinfo.fieldtype in idxmap:
+        idxtypes = idxmap[fieldinfo.fieldtype]
+    else:
+        idxtypes = ('field',) #default
+    return idxtypes
+
+
+def field_index_name(idxtype, fieldinfo):
+    """given index type and field info, return a string name"""
+    if isinstance(fieldinfo.fieldtype, zope.schema.interfaces.ICollection):
+        field = fieldinfo() # resolve field instance
+        fieldtype = field.value_type.__name__
+    else:
+        fieldtype = fieldinfo.fieldtype.__name__
+    return '.'.join((idxtype, fieldtype, fieldinfo.name,))
 
 
 class DottedNameInterfaceResolver(object):
@@ -133,7 +167,7 @@ class FieldInfo(object):
     def __init__(self, context, field, **kwargs):
         if not ISchemaInfo.providedBy(context):
             raise ValueError('ISchemaInfo must be provided by context')
-        if not IField.providedBy(field):
+        if not zope.schema.interfaces.IField.providedBy(field):
             raise ValueError('field for FieldInfo must provide IField')
         self.context = context  # SchemaInfo object
         self._load_field_metadata(field)
@@ -143,7 +177,14 @@ class FieldInfo(object):
         self.title = field.title
         self.description = field.description
         self.fieldtype = field_types(field)[0]
-        self.indexes = [] #initially empty
+        self._add_index_names()
+    
+    def _add_index_names(self):
+        #import pdb; pdb.set_trace()
+        self.indexes = []
+        idxtypes = field_index_types(self)
+        for idxtype in idxtypes:
+            self.indexes.append(field_index_name(idxtype, self))
     
     def __call__(self):
         iface = self.context()
