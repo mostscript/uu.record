@@ -79,12 +79,23 @@ Usage
     ...     fieldinfo = [fi for fi in info.fields if fi.name==fieldname][0]
     ...     assert fieldinfo() is field
     ... 
+    
+    Finally, we can register SchemaInfo as a multi-adapter for any arbitrary
+    context and some schema (providing IInterface):
+    
+    >>> from zope.interface import Interface #any object provides this
+    >>> from zope.interface.interfaces import IInterface
+    >>> gsm.registerAdapter(factory=SchemaInfo, provided=ISchemaInfo)
+    >>> from zope.component import getMultiAdapter
+    >>> assert isinstance(getMultiAdapter((None, IRecord), ISchemaInfo),
+    ...                   SchemaInfo)
+    >>> 
 
 """
 
-from zope.component import queryUtility
+from zope.component import adapts, queryUtility
 from zope.dottedname.resolve import resolve
-from zope.interface import implements, providedBy
+from zope.interface import Interface, implements, providedBy
 from zope.interface.interfaces import IInterface
 from zope.schema.interfaces import IField
 from zope.schema import getFieldsInOrder
@@ -170,6 +181,8 @@ class SchemaInfo(object):
     """
     
     implements(ISchemaInfo)
+    
+    adapts(Interface, IInterface)
     
     def __init__(self, context, schema):
         if not IInterface.providedBy(schema):
