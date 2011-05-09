@@ -13,9 +13,9 @@ class IRecord(ILocation):
     string form as an attribute or property of the object, with a location
     context (ILocation __parent__ and __name__) attributes.
     """
-    record_uid = schema.Bytes(
-        title=u'Form styles',
-        description=u'CSS stylesheet rules for form (optional).',
+    record_uid = schema.BytesLine(
+        title=u'Record UID',
+        description=u'Record UUID in string format',
         defaultFactory=lambda: str(uuid.uuid4()), #random UUID
         )
 
