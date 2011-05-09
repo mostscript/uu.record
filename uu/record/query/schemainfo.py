@@ -83,6 +83,14 @@ Usage
     ...         assert fieldinfo.indexes #non-empty
     ... 
     
+    The schema info object has the sum of all index names for fields managed:
+    
+    >>> assert info.indexes #non-empty
+    >>> field_indexes = []
+    >>> for fi in info.fields:
+    ...     field_indexes += fi.indexes
+    >>> assert len(info.indexes) == len(field_indexes)
+    
     Finally, we can register SchemaInfo as a multi-adapter for any arbitrary
     context and some schema (providing IInterface):
     
@@ -229,9 +237,10 @@ class SchemaInfo(object):
         if not IInterface.providedBy(schema):
             raise ValueError('cannot adapt, context is not an interface')
         self.context = context
+        self.indexes = [] #initially empty; populated by _load_schema_fields
         self._load_schema_name(schema)
         self._load_schema_fields(schema)
-        self.indexes = [] #initially empty; intended to be set by callers.
+
     
     def _load_schema_name(self, schema):
         self.namespace = 'dotted'
@@ -240,7 +249,10 @@ class SchemaInfo(object):
     def _load_schema_fields(self, schema):
         self.fields = []
         for fieldname, field in getFieldsInOrder(schema):
-            self.fields.append(FieldInfo(self, field))
+            info = FieldInfo(self, field)
+            self.fields.append(info)
+            if info.indexes:
+                self.indexes += info.indexes
     
     def __call__(self):
         if self.namespace != 'dotted':
