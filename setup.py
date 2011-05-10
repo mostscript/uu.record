@@ -27,6 +27,8 @@ setup(name='uu.record',
           'zope.schema>=3.8.0',
           'zope.lifecycleevent',
           'Products.CMFCore',
+          'repoze.catalog>=0.8.0',
+          'zope.index',
           # -*- Extra requirements: -*-
       ],
       extras_require = {
