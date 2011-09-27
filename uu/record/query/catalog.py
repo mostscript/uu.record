@@ -1,201 +1,56 @@
-from zope.interface import Interface
-from zope.interface.interfaces import IInterface
+from persistent import Persistent
+from persistent.dict import PersistentDict
+from persistent.list import PersistentList
+from zope.component import queryUtility, getMultiAdapter
+from zope.interface import implements
 from zope import schema
+import repoze.catalog
+from repoze.catalog.catalog import Catalog
+from repoze.catalog.document import DocumentMap
+
+from uu.record.query.interfaces import IRecordCatalog, ISchemaInfo
+from uu.record.interfaces import IRecordResolver
 
 
-class ISchemaResolver(Interface):
+class RecordCatalog(Persistent):
     """
-    Utility component to resolve a schema by name
-    
-    Recommended: register named utilities looked up by the name of the
-                 naming strategy (e.g. 'dottedname', 'md5sum') for the 
-                 interface.  Interfaces implemented in Python code
-                 will likely be best resolved by dotted name, though
-                 other strategies may be appropriate for different
-                 application use cases.
-    """
-    
-    def __call__(self, name):
-        """
-        Attempt to resolve schema/interface object given a name.
-        
-        Returns None on unresolved schema/interface object.
-        """
-
-
-class IFieldInfo(Interface):
-    """general metadata about a schema field"""
-    
-    name = schema.BytesLine()
-    
-    title = schema.TextLine()
-    
-    description = schema.Text()
-    
-    fieldtype = schema.Object(
-        title=u'Field type',
-        description=u'The interface that the field provides.',
-        schema=IInterface,
-        constraint=lambda v: isinstance(v, IField),
-        )
-    
-    indexes = schema.List(
-        title=u'Indexes',
-        description=u'Indexes related to this field',
-        value_type=schema.BytesLine(title=u'Index name'),
-        defaultFactory=list,
-        required=True,
-        )
-    
-    context = schema.Object(
-        title=u'Context',
-        description=u'Context object providing ISchemaInfo',
-        schema=Interface,
-        required=False,
-        )
-    
-    def __call__():
-        """
-        Resolve field object instance using self.context; if self.context
-        is None, return None.  self.context may be None, but calling
-        a non-None self.context (an ISchemaInfo object) may also return
-        None for resolution of a field necessary; in such case, this
-        method may return None as well.
-        """
-
-
-class ISchemaInfo(Interface):
-    """
-    A metadata wrapper and object resolver for a schema.  May be used
-    as an interface to adapt any schema.
+    Record catalog is facade for repoze.catalog backend providing 
+    IRecordCatalog front-end.
     """
     
-    name = schema.BytesLine(
-        title=u'Schema name',
-        description=u'Dotted name of interface, or md5 signature of '\
-                    u'serialization.',
-        required=True,
-        )
+    implements(IRecordCatalog)
     
-    namespace = schema.BytesLine(
-        title=u'Namespace',
-        description=u'Namspace/kind of schema identifier/name.',
-        required=True,
-        default='dottedname',
-        )
+    def __init__(self, name=None):
+        self.name = name
+        self.indexer = Catalog()
+        self.mapper = DocumentMap()
+        self.supported = PersistentDict() #schema id/name->ISchemaInfo
+        self._index_owners = PersistentDict() # idx name->list of schema names
     
-    context = schema.Object(
-        title=u'Context',
-        description=u'Context object, may be catalog.',
-        schema=Interface,
-        required=False,
-        )
-    
-    fields = schema.List(
-        value_type=schema.Object(schema=IFieldInfo),
-        defaultFactory=list,
-        required=True,
-        )
-    
-    indexes = schema.List(
-        title=u'Indexes',
-        description=u'Index names related to this schema',
-        value_type=schema.BytesLine(title=u'Index name'),
-        defaultFactory=list,
-        required=True,
-        )
-    
-    def __call__():
-        """
-        Resolve reference to schema/interface object providing IInterface
-        and all fields advertised here, for the given schema name/identifier.
-        
-        May delegate to other application/framework specific components
-        including (but not limited to) application-specific ISchemaResolver
-        utilities.
-        
-        Implementations may delegate in series to multiple named
-        ISchemaResolver components, which may have names like 'dottedname'
-        or 'md5sum'.
-        
-        Returns None if no interface can be resolved, or if no suitable
-        ISchemaResolver component can be found.
-        """
-
-
-IFieldInfo['context'].schema = ISchemaInfo #workaround order of definition
-
-
-class IQuery(Interface):
-    """
-    Marker for a class providing a query part/operator; note it is the 
-    class of operator, not instances thereof, that provide this interface.
-    """
-
-
-class IBooleanOperator(IQuery):
-    """
-    Boolean operator combines queries.
-    """
-    
-    __name__ = schema.BytesLine(title=u'Name', readonly=True)
-    
-    def __call__(*queries):
-        """Combine queries"""
-
-
-class IComparator(IQuery):
-    """
-    Comparison operator class used to evaluate an index against a value, used
-    as a specification for query by catalog search execution.
-    """
-    
-    __name__ = schema.BytesLine(title=u'Name', readonly=True)
-    
-    def __call__(index_name, *args, **kwargs):
-        """
-        Call filter for use in searching, for most comparators, a single
-        argument of 'value' is provided; however, more complex comparisons
-        may exist (e.g. a range search).
-        """
-
-
-DEFAULT_GETUID = lambda record: getattr(record, 'uid', str(uuid.uuid4()))
-
-class IRecordCatalog(Interface):
-    
-    mapper = schema.Object(
-        title=u'Document mapper',
-        description=u'UUID/integer document id mapper and metadata storage. '\
-                    u'Implementations are assumed interface-compatible with '\
-                    u'repoze.catalog.document.DocumentMap class API.',
-        schema=Interface,
-        required=True,
-        )
-    
-    indexer = schema.Object(
-        title=u'Indexer',
-        description=u'Catalog of indexes, assumed interface-compatible with '\
-                    u'repoze.catalog.catalog.Catalog class API.',
-        schema=Interface,
-        required=True,
-        )
-    
-    supported = schema.Dict(
-        title=u'Mapping of supported schema',
-        description=u'Keys: identifiers/names; values: ISchemaInfo objects.',
-        key_type=schema.BytesLine(),
-        value_type=schema.Object(schema=ISchemaInfo),
-        required=True,
-        )
-    
-    def getObject(identifier):
+    def getObject(self, identifier):
         """
         Given an identifier as either a UID mapped in self.mapper or an
         integer id key from self.indexer, resolve object or return None.
         """
+        if isinstance(identifier, int):
+            identifier = self.mapper.address_for_docid(identifier) #int->uuid
+        resolver = queryUtility(IRecordResolver)
+        if resolver is None:
+            return None
+        return resolver()
     
-    def bind(schema, omit=(), index_types=None):
+    def _add_index(self, idxname, idxtype, getter=None):
+        if getter is None:
+            getter = lambda obj, name, default: getattr(obj, name, default)
+        callback = lambda obj, default: getter(obj, idxname, default)
+        idxcls = {
+            'field'     : repoze.catalog.indexes.field.CatalogFieldIndex,
+            'text'      : repoze.catalog.indexes.text.CatalogTextIndex,
+            'keyword'   : repoze.catalog.indexes.keyword.CatalogKeywordIndex,
+            }[idxtype]
+        self.indexer[idxname] = idxcls(callback)
+    
+    def bind(self, schema, omit=(), index_types=None):
         """
         Bind a schema providing IInterface.
         
@@ -213,6 +68,13 @@ class IRecordCatalog(Interface):
         TextLine or BytesLine, then *both* 'text' and 'field' indexes will
         be created for that field.  If the value type is Text (multi-line
         text), then only a (full) 'text' index will be created.
+        
+        If the field is a Bytes field, we cannot tell whether this field is
+        tokenizable text, so we omit Bytes fields by default.  However, 
+        since BytesLine fields are constrained by textual cues (absense of
+        line feeds), we index BytesLine as field and text values.  This is
+        a sensible default behavior, considering some Bytes fields may
+        contain large size binary content we do not want to index.
         
         Index types can be specified by providing a dict/mapping of 
         field name keys to index type values.  Such values can be provided
@@ -238,8 +100,22 @@ class IRecordCatalog(Interface):
         
             * Specifying a keyword index on a non-sequence field.
         """
+        # adapt context, schema: produces schema+field info with index
+        # names populated for use here.
+        info = getMultiAdapter((self, schema),
+                               ISchemaInfo) #adapt context, schema
+        _marker = object()
+        for fieldinfo in info.fields:
+            for idxname in fieldinfo.indexes:
+                idxtype = idxname.split('.')[0]
+                if idxname not in self.indexer:
+                    self._add_index(idxname, idxtype)
+                    if idxname not in self._index_owners:
+                        self._index_owners[idxname] = PersistentList()
+                    self._index_owners[idxname].append(info.name)
+        self.supported[info.name] = info
     
-    def unbind(schema, remove_indexes=False):
+    def unbind(self, schema, remove_indexes=False):
         """
         Unbind a schema providing IInterface or object providing ISchemaInfo,
         removing it from self.supported.
@@ -248,13 +124,25 @@ class IRecordCatalog(Interface):
         indexes for which the schema in question is the only schema in the 
         catalog managing any respective index name.
         """
+        info = getMultiAdapter((self, schema),
+                               ISchemaInfo) #adapt context, schema
+        if info.name in self.supported:
+            del(self.supported[name])
+            if remove_indexes:
+                for idxname in info.indexes:
+                    if idxname in self.indexer:
+                        owners = self._index_owners.get(idxname, ())
+                        if len(owners)==1 and info.name in owners:
+                            del(self.indexer[idxname])
+                            del(self._index_owners[idxname])
     
-    def searchable(schema):
+    def searchable(self, schema):
         """
         Return a tuple of IFieldInfo objects, which provide the names of fields
         with respective indexes.  Fields without indexes will not have an
         IFieldInfo object returned.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def uniqueValuesFor(index):
         """
@@ -266,6 +154,7 @@ class IRecordCatalog(Interface):
         If index in catalog for the index name is a text index (incapable
         of providing unique values), raise a ValueError.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def comparatorsFor(index):
         """
@@ -274,6 +163,7 @@ class IRecordCatalog(Interface):
         a comparator function or class providing IComparator, and the
         second item is a human-readable label for that comparator.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def index(record, uid=None, getuid=DEFAULT_GETUID):
         """
@@ -305,6 +195,7 @@ class IRecordCatalog(Interface):
         identifier (__name__) and container (__parent__) in field and path
         indexes respectively.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def unindex(uid):
         """
@@ -312,18 +203,22 @@ class IRecordCatalog(Interface):
         a string representation of UUID, remove the record from self.indexer
         and self.mapper.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def reindex(record, uid=None, getuid=DEFAULT_GETUID):
         """
         Alternate spelling for index(), may be optimized in implementation
         or may simply just provide a synonymous call.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def __getitem__(name):
         """return index for name from self.indexer, or raise KeyError"""
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def get(name, default=None):
         """return index for name from self.indexer, default, or None"""
+        raise NotImplementedError('TODO') #TODO TODO TODO
 
     def __setitem__(name, index):
         """
@@ -331,12 +226,14 @@ class IRecordCatalog(Interface):
         self.bind(schema) for adding indexes based on zope.schema fields
         over this.
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def search(**query):
         """
         Given a search as index-name/value mapping, return a results in the
         form (count, iterable of result uids).
         """
+        raise NotImplementedError('TODO') #TODO TODO TODO
     
     def query(query, *args, **kwargs):
         """
@@ -347,7 +244,5 @@ class IRecordCatalog(Interface):
         for sorting results.  Each implementation should gracefully ignore
         arguments it does not know about.
         """
-
-
-
+        raise NotImplementedError('TODO') #TODO TODO TODO
 
