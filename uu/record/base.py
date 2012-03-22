@@ -686,6 +686,7 @@ class RecordContainer(Persistent):
         record = self.factory(context=self, uid=uid)
         if data and (hasattr(data, 'get') and 
                      hasattr(data, 'items')):
+            self._before_populate(record, data)
             self._populate_record(record, data)
         notify(ObjectCreatedEvent(record))
         return record
@@ -720,6 +721,9 @@ class RecordContainer(Persistent):
     def _filtered_data(self, data):
         fieldnames = self._ad_hoc_fieldlist(data)
         return dict([(k, getattr(data, k, None)) for k in fieldnames])
+    
+    def _before_populate(self, record, data):
+        pass #hook for subclasses
     
     def _before_update_notification(self, record, data):
         pass #hook for subclasses
@@ -764,6 +768,7 @@ class RecordContainer(Persistent):
         record = self.get(uid, None)
         if record is not None:
             # existing record, already known/saved
+            self._before_populate(record, data)
             self._populate_record(record, data) # also notifies modified event
         else:
             # new, create, then add
