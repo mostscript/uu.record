@@ -28,11 +28,12 @@ setup(name='uu.record',
           'zope.lifecycleevent',
           'Products.CMFCore',
           'repoze.catalog>=0.8.0',
+          'plone.uuid',
           'zope.index',
           # -*- Extra requirements: -*-
       ],
       extras_require = {
-          'test': [ 'plone.testing>=4.0a6', ],
+          'test': [ 'plone.testing>=4.0a6', 'zope.configuration',],
       },
       entry_points="""
       # -*- Entry points: -*-

@@ -1,5 +1,6 @@
 import uuid
 
+from plone.uuid.interfaces import IAttributeUUID
 from zope.container.interfaces import IOrderedContainer
 from zope.interface import Interface
 from zope.location.interfaces import ILocation
@@ -7,12 +8,16 @@ from zope.location.interfaces import ILocation
 from zope import schema
 
 
-class IRecord(ILocation):
+class IRecord(ILocation, IAttributeUUID):
     """
     A record is an object with a unique id (RFC 4122 UUID) stored in 
     string form as an attribute or property of the object, with a location
     context (ILocation __parent__ and __name__) attributes.
+    
+    Note: IAttributeUUID interface is a normalizing proxy to
+    self.record_uid value.
     """
+    
     record_uid = schema.BytesLine(
         title=u'Record UID',
         description=u'Record UUID in string format',

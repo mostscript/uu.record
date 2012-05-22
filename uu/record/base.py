@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from persistent import Persistent
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
+from plone.uuid.interfaces import ATTRIBUTE_NAME as UUID_ATTR
 from zope.event import notify
 from zope.lifecycleevent import ObjectCreatedEvent, ObjectModifiedEvent
 from zope.lifecycleevent import ObjectAddedEvent, ObjectRemovedEvent
@@ -17,18 +18,39 @@ from BTrees.OOBTree import OOBTree
 from uu.record.interfaces import IRecord, IRecordContainer
 
 
+def _normalize_uuid_representation(v):
+    if isinstance(v, int) or isinstance(v, long):
+        return str(uuid.UUID(int=v))    # long to canonical
+    v = str(v)
+    if len(v) == 36:
+        return v                        # canonical
+    if len(v) == 32 and '-' not in v:
+        return str(uuid.UUID(v))        # hex -> canonical form
+    if len(v) == 16:
+        return str(uuid.UUID(bytes=v))  # bytes -> canonical
+    if v in (None, 'None'):
+        return None
+    return v                            # fallback / unknown
+
+
 class Record(Persistent):
     implements(IRecord)
     
     record_uid = None
     
     def __init__(self, context=None, uid=None):
-        #self.context = self.__parent__ = context
-        if uid is None:
-            uid = str(uuid.uuid4())
-        self.record_uid = str(uid)
+        self.record_uid = str(uid) if uid is not None else str(uuid.uuid4())
         self._v_parent = None
     
+    # compatibility w/ plone.uuid IAttributeUUID:
+    def _set_uid(self, v):
+        self.record_uid = _normalize_uuid_representation(v)
+    
+    def _get_uid(self):
+        return _normalize_uuid_representation(self.record_uid)
+    
+    locals()[UUID_ATTR] = property(_get_uid, _set_uid)
+
     @property
     def __parent__(self):
         return getattr(self, '_v_parent', None)
@@ -110,7 +132,20 @@ class RecordContainer(Persistent):
     
     >>> assert entry1.record_uid != entry2.record_uid
     >>> assert entry2.record_uid != randomuid
-        
+    
+    The record objects provide plone.uuid.interfaces.IAttributeUUID as an
+    alternative way to get the UUID value (string representation) by 
+    adapting to IUUID:
+    
+    >>> from zope.configuration import xmlconfig
+    >>> import plone.uuid
+    >>> c = xmlconfig.file('configure.zcml', plone.uuid)  # load registrations
+    >>> #from plone.uuid.interfaces import IUUID, IAttributeUUID
+    >>> #from zope.component import queryAdapter
+    >>> #assert IAttributeUUID.providedBy(entry1)
+    >>> #assert queryAdapter(entry1, IUUID) is not None
+    >>> #assert queryAdapter(entry1, IUUID) == entry1.record_uid
+    
     Now when we have a parent context with a schema, the created entries will
     be signed with the schema and provide it.
     
@@ -417,18 +452,22 @@ class RecordContainer(Persistent):
     ...     print 'object added'
     ... 
     
-    Next, let's configure zope.event to use zope.component event subscribers;
-    most frameworks using zope.lifecycleevent already do this, but we will
-    configure this explicitly for documentation/testing purposes:
+    Next, let's configure zope.event to use zope.component event
+    subscribers; most frameworks using zope.lifecycleevent already do
+    this, but we will configure this explicitly for documentation 
+    and testing purposes, only if not already enabled:
     
     >>> import zope.event
     >>> from zope.component.event import objectEventNotify
-    >>> zope.event.subscribers.append(objectEventNotify)
+    >>> from zope.component import getGlobalSiteManager
+    >>> gsm = getGlobalSiteManager()
+    >>> all_handlers = [r.handler for r in gsm.registeredHandlers()]
+    >>> if objectEventNotify not in all_handlers:
+    ...     zope.event.subscribers.append(objectEventNotify)
+    ... 
     
     Now, let's register the handlers:
     
-    >>> from zope.component import getGlobalSiteManager
-    >>> gsm = getGlobalSiteManager()
     >>> for h in (handle_create, handle_modify, handle_remove, handle_add):
     ...     gsm.registerHandler(h)
     ... 
