@@ -23,11 +23,16 @@ class Record(Persistent):
     record_uid = None
     
     def __init__(self, context=None, uid=None):
-        self.context = self.__parent__ = context
+        #self.context = self.__parent__ = context
         if uid is None:
             uid = str(uuid.uuid4())
         self.record_uid = str(uid)
+        self._v_parent = None
     
+    @property
+    def __parent__(self):
+        return getattr(self, '_v_parent', None)
+     
     @property
     def __name__(self):
         return self.record_uid
@@ -595,7 +600,10 @@ class RecordContainer(Persistent):
         """
         if self.RECORD_INTERFACE.providedBy(uid):
             uid = uid.record_uid  #special case to support __contains__() impl
-        return self._entries.get(str(uid), default)
+        v = self._entries.get(str(uid), default)
+        if v and getattr(v, '_v_parent', None) is None:
+            v._v_parent = self  # container marks item with itself as context
+        return v
     
     def __contains__(self, record):
         """
@@ -626,7 +634,7 @@ class RecordContainer(Persistent):
     
     def items(self):
         """return ordered pairs of key/values"""
-        return tuple([(uid, self._entries[uid]) for uid in self._order])
+        return tuple([(uid, self.get(uid)) for uid in self._order])
     
     def __iter__(self):
         return self._order.__iter__()
