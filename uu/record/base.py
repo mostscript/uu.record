@@ -720,7 +720,9 @@ class RecordContainer(Persistent):
     
     def _filtered_data(self, data):
         fieldnames = self._ad_hoc_fieldlist(data)
-        return dict([(k, getattr(data, k, None)) for k in fieldnames])
+        if IRecord.providedBy(data):
+            return dict([(k, getattr(data, k, None)) for k in fieldnames])
+        return dict([(k, data.get(k, None)) for k in fieldnames])
     
     def _before_populate(self, record, data):
         pass #hook for subclasses
