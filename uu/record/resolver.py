@@ -1,6 +1,6 @@
 
 from zope.interface import implements
-from zope.app.component.hooks import getSite
+from zope.component.hooks import getSite
 from Products.CMFCore.utils import getToolByName
 
 from uu.record.interfaces import IRecordResolver
