@@ -351,7 +351,7 @@ class RecordContainer(Persistent):
     >>> import json  # requires Python >= 2.6
     >>> data['name'] = 'Chunky monkey'
     >>> serialized = json.dumps([data,], indent=2)  # JSON array of one item...
-    >>> print serialized  # doctest: +ELLIPSIS
+    >>> print serialized  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [
       {
         "party_time": "11/06/05 12:00",
@@ -373,7 +373,7 @@ class RecordContainer(Persistent):
 
     >>> data['name'] = 'Curious George'
     >>> serialized = json.dumps(data, indent=2)  # JSON object, not array.
-    >>> print serialized  # doctest: +ELLIPSIS
+    >>> print serialized  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     {
       "party_time": "11/06/05 12:00",
       "birthday": "77/06/01",
