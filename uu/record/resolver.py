@@ -19,7 +19,7 @@ class CatalogRecordResolver(object):
     
     implements(IRecordResolver)
     
-    INDEX_NAME = 'contained_uids' #needs to be KeywordIndex in portal_catalog
+    INDEX_NAME = 'contained_uids'  # needs to be KeywordIndex in portal_catalog
     loaded = False
     
     def _load_globals(self):
@@ -37,9 +37,9 @@ class CatalogRecordResolver(object):
     def context(self, uid):
         if not self.loaded:
             self._load_globals()
-        brains = self.catalog.query({INDEX_NAME: str(uid)})
+        brains = self.catalog.query({self.INDEX_NAME: str(uid)})
         if brains:
-            return brains[0].getObject() #first location should be only.
+            return brains[0].getObject()  # first location should be only.
         return None
     
     def contained(self, uid):
