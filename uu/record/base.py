@@ -124,7 +124,7 @@ class RecordContainer(Persistent):
     >>> from uu.record.interfaces import IRecord
     >>> assert IRecord.providedBy(entry1)
     >>> assert IRecord.providedBy(entry2)
-    >>> is_uuid = lambda u: isinstance(u, str) and len(u)==36
+    >>> is_uuid = lambda u: isinstance(u, str) and len(u) == 36
     >>> assert is_uuid(entry1.record_uid)
     >>> assert is_uuid(entry2.record_uid)
 
@@ -141,11 +141,11 @@ class RecordContainer(Persistent):
     >>> from zope.configuration import xmlconfig
     >>> import plone.uuid
     >>> c = xmlconfig.file('configure.zcml', plone.uuid)  # load registrations
-    >>> # from plone.uuid.interfaces import IUUID, IAttributeUUID
-    >>> # from zope.component import queryAdapter
-    >>> # assert IAttributeUUID.providedBy(entry1)
-    >>> # assert queryAdapter(entry1, IUUID) is not None
-    >>> # assert queryAdapter(entry1, IUUID) == entry1.record_uid
+    >>> from plone.uuid.interfaces import IUUID, IAttributeUUID
+    >>> from zope.component import queryAdapter
+    >>> assert IAttributeUUID.providedBy(entry1)
+    >>> assert queryAdapter(entry1, IUUID) is not None
+    >>> assert queryAdapter(entry1, IUUID) == entry1.record_uid
 
     Now when we have a parent context with a schema, the created entries will
     be signed with the schema and provide it.
