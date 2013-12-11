@@ -459,14 +459,14 @@ class RecordContainer(Persistent):
     and testing purposes, only if not already enabled:
 
     >>> import zope.event
-    >>> from zope.component.event import objectEventNotify
     >>> from zope.component import getGlobalSiteManager
     >>> gsm = getGlobalSiteManager()
-    >>> all_handlers = [r.handler for r in gsm.registeredHandlers()]
-    >>> if objectEventNotify not in all_handlers:
-    ...     zope.event.subscribers.append(objectEventNotify)
-    ...
 
+    Importing zope.component.event puts dispatch() in zope.event.subscribers:
+
+    >>> from zope.component import event
+    >>> assert event.dispatch in zope.event.subscribers
+    
     Now, let's register the handlers:
 
     >>> for h in (handle_create, handle_modify, handle_remove, handle_add):
