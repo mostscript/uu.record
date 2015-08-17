@@ -9,7 +9,6 @@ from persistent import Persistent
 from persistent.dict import PersistentDict
 from persistent.list import PersistentList
 from plone.uuid.interfaces import ATTRIBUTE_NAME as UUID_ATTR
-from zope.event import notify
 from zope.lifecycleevent import ObjectCreatedEvent, ObjectModifiedEvent
 from zope.lifecycleevent import ObjectAddedEvent, ObjectRemovedEvent
 from zope.lifecycleevent import Attributes
@@ -17,6 +16,7 @@ from zope.interface import implements
 from BTrees.OOBTree import OOBTree
 
 from uu.record.interfaces import IRecord, IRecordContainer
+from utils import notify
 
 
 def _normalize_uuid_representation(v):
@@ -693,7 +693,7 @@ class RecordContainer(Persistent):
     def _type_whitelist_validation(self, value):
         vtype = type(value)
         if vtype in self.MAPPING_WHITELIST:
-            for k, v in v.items():
+            for k, v in value.items():
                 if not (k in self.TYPE_WHITELIST and v in self.TYPE_WHITELIST):
                     raise ValueError('Unsupported mapping key/value type')
         elif vtype in self.SEQUENCE_WHITELIST:
