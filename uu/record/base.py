@@ -789,6 +789,11 @@ class RecordContainer(Persistent):
     def _before_update_notification(self, record, data):
         pass  # hook for subclasses
 
+    def notify_data_changed(self):
+        notify(
+            ObjectModifiedEvent(self, Attributes(IRecordContainer, 'items'))
+            )
+
     def update(self, data, suppress_notify=False):
         """
         Given data, which may be a dict of field key/values or an actual
@@ -837,7 +842,7 @@ class RecordContainer(Persistent):
             self.add(record)            # notified added event
         self._before_update_notification(record, data)
         if (not suppress_notify) and getattr(record, '_p_changed', None):
-            notify(ObjectModifiedEvent(self))
+            self.notify_data_changed()
         return record
 
     def _process_container_metadata(self, data):
@@ -877,7 +882,7 @@ class RecordContainer(Persistent):
             del(self[deluid])  # remove any previous entries not in the form
         self._order = PersistentList(uids)  # replace old with new uid order
         if data and _modified:
-            notify(ObjectModifiedEvent(self))  # notify only once!
+            self.notify_data_changed()  # notify just once
 
 
 class BTreeRecordContainer(RecordContainer):
