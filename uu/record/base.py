@@ -838,7 +838,7 @@ class RecordContainer(Persistent):
             self._populate_record(record, data)  # also notifies modified event
         else:
             # new, create, then add
-            record = self.create(data)  # notifies created, modified events
+            record = self.create(data)  # notifies created, modified for record
             self.add(record)            # notified added event
         self._before_update_notification(record, data)
         if (not suppress_notify) and getattr(record, '_p_changed', None):
@@ -870,17 +870,22 @@ class RecordContainer(Persistent):
                     _data = [_data]  # wrap singular item update in list
             _keynorm = lambda o: dict([(str(k), v) for k, v in o.items()])
             data = [_keynorm(o) for o in _data]
-            uids = [str(o['record_uid']) for o in data]
+        uids = [str(o['record_uid']) for o in data]
+        existing_uids = set(self.keys())
+        added_uids = set(uids) - existing_uids
+        modified_uids = set(uids).intersection(existing_uids)
         for entry_data in data:
             if 'record_uid' not in entry_data:
                 raise ValueError('record missing UID')
             record = self.update(entry_data, suppress_notify=True)
             if not _modified and getattr(record, '_p_changed', None):
                 _modified = True
-        remove_uids = set(self.keys()) - set(uids)
+        remove_uids = existing_uids - set(uids)
         for deluid in remove_uids:
             del(self[deluid])  # remove any previous entries not in the form
         self._order = PersistentList(uids)  # replace old with new uid order
+        if added_uids or modified_uids:
+            _modified = True
         if data and _modified:
             self.notify_data_changed()  # notify just once
 
